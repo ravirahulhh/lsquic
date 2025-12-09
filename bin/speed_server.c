@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/queue.h>
 #include <sys/time.h>
 #include <time.h>
@@ -24,6 +25,9 @@
 #include "prog.h"
 
 #include "../src/liblsquic/lsquic_logger.h"
+
+/* Congestion control algorithm: 1=Cubic, 2=BBR, 3=Adaptive */
+static int g_cc_algo = 1;  /* Default: Cubic */
 
 struct lsquic_conn_ctx;
 
@@ -237,6 +241,8 @@ usage (const char *prog)
 "\n"
 "Options:\n"
 "   -n N        Exit after N connections\n"
+"   -C ALGO     Congestion control algorithm (default: cubic)\n"
+"               cubic, bbr, adaptive\n"
             , prog);
 }
 
@@ -254,11 +260,23 @@ main (int argc, char **argv)
     prog_init(&prog, LSENG_SERVER, &server_ctx.sports,
                                     &server_speed_stream_if, &server_ctx);
 
-    while (-1 != (opt = getopt(argc, argv, PROG_OPTS "hn:")))
+    while (-1 != (opt = getopt(argc, argv, PROG_OPTS "hn:C:")))
     {
         switch (opt) {
         case 'n':
             server_ctx.n_conn = atoi(optarg);
+            break;
+        case 'C':
+            if (strcasecmp(optarg, "cubic") == 0)
+                g_cc_algo = 1;
+            else if (strcasecmp(optarg, "bbr") == 0)
+                g_cc_algo = 2;
+            else if (strcasecmp(optarg, "adaptive") == 0)
+                g_cc_algo = 3;
+            else {
+                fprintf(stderr, "Unknown CC algorithm: %s (use cubic, bbr, or adaptive)\n", optarg);
+                exit(1);
+            }
             break;
         case 'h':
             usage(argv[0]);
@@ -269,6 +287,11 @@ main (int argc, char **argv)
                 exit(1);
         }
     }
+
+    /* Set congestion control algorithm */
+    prog.prog_settings.es_cc_algo = g_cc_algo;
+    const char *cc_name = g_cc_algo == 1 ? "Cubic" : (g_cc_algo == 2 ? "BBR" : "Adaptive");
+    LSQ_NOTICE("Using congestion control: %s", cc_name);
 
     add_alpn("speed");
     if (0 != prog_prep(&prog))

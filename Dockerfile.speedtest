@@ -87,8 +87,9 @@ case "$MODE" in\n\
         ;;\n\
     *)\n\
         echo "Usage (with --network host):"\n\
-        echo "  Server: docker run --network host IMAGE server"\n\
-        echo "  Client: docker run --network host IMAGE client -s HOST:9331 -b 1G"\n\
+        echo "  Server: docker run --network host IMAGE server [-C cubic|bbr]"\n\
+        echo "  Client: docker run --network host IMAGE client -s HOST:9331 -b 1G [-C cubic|bbr]"\n\
+        echo "Options: -C cubic|bbr|adaptive (default: cubic)"\n\
         exit 1\n\
         ;;\n\
 esac' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh

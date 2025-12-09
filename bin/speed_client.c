@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/queue.h>
 #include <sys/time.h>
 #include <time.h>
@@ -25,6 +26,9 @@
 
 /* Default: send 1 GB */
 static uint64_t g_bytes_to_send = 1ULL * 1024 * 1024 * 1024;
+
+/* Congestion control algorithm: 1=Cubic, 2=BBR, 3=Adaptive */
+static int g_cc_algo = 1;  /* Default: Cubic */
 
 /* Random data buffer */
 #define SEND_BUF_SIZE (64 * 1024)  /* 64KB */
@@ -250,6 +254,8 @@ usage (const char *prog)
 "Options:\n"
 "   -b BYTES    Number of bytes to send (default: 1GB)\n"
 "               Supports suffixes: K, M, G (e.g., -b 500M, -b 2G)\n"
+"   -C ALGO     Congestion control algorithm (default: cubic)\n"
+"               cubic, bbr, adaptive\n"
             , prog);
 }
 
@@ -284,11 +290,23 @@ main (int argc, char **argv)
     prog_init(&prog, 0, &sports, &client_speed_stream_if, &client_ctx);
     prog.prog_api.ea_alpn = "speed";
 
-    while (-1 != (opt = getopt(argc, argv, PROG_OPTS "hb:")))
+    while (-1 != (opt = getopt(argc, argv, PROG_OPTS "hb:C:")))
     {
         switch (opt) {
         case 'b':
             g_bytes_to_send = parse_size(optarg);
+            break;
+        case 'C':
+            if (strcasecmp(optarg, "cubic") == 0)
+                g_cc_algo = 1;
+            else if (strcasecmp(optarg, "bbr") == 0)
+                g_cc_algo = 2;
+            else if (strcasecmp(optarg, "adaptive") == 0)
+                g_cc_algo = 3;
+            else {
+                fprintf(stderr, "Unknown CC algorithm: %s (use cubic, bbr, or adaptive)\n", optarg);
+                exit(1);
+            }
             break;
         case 'h':
             usage(argv[0]);
@@ -300,10 +318,14 @@ main (int argc, char **argv)
         }
     }
 
+    /* Set congestion control algorithm */
+    prog.prog_settings.es_cc_algo = g_cc_algo;
+    const char *cc_name = g_cc_algo == 1 ? "Cubic" : (g_cc_algo == 2 ? "BBR" : "Adaptive");
+
     init_random_buffer();
     
     double mb = g_bytes_to_send / (1024.0 * 1024.0);
-    LSQ_NOTICE("Will send %.2f MB of random data", mb);
+    LSQ_NOTICE("Will send %.2f MB of random data (CC: %s)", mb, cc_name);
 
     if (0 != prog_prep(&prog))
     {

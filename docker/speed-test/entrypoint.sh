@@ -16,17 +16,18 @@ case "$MODE" in
         ;;
     *)
         echo "Usage (with --network host):"
-        echo "  Server: docker run --network host lsquic-speed-test server"
-        echo "  Client: docker run --network host lsquic-speed-test client -s <server_ip>:9331 -b 1G"
+        echo "  Server: docker run --network host lsquic-speed-test server [-C cubic|bbr|adaptive]"
+        echo "  Client: docker run --network host lsquic-speed-test client -s <server_ip>:9331 -b 1G [-C cubic|bbr|adaptive]"
         echo ""
-        echo "Client options:"
-        echo "  -s HOST:PORT   Server address (required)"
+        echo "Options:"
+        echo "  -s HOST:PORT   Server address (required for client)"
         echo "  -b BYTES       Bytes to send (default: 1G)"
         echo "                 Supports K, M, G suffixes"
+        echo "  -C ALGO        Congestion control: cubic (default), bbr, adaptive"
         echo ""
         echo "Examples:"
-        echo "  docker run --network host lsquic-speed-test client -s 192.168.1.100:9331 -b 500M"
-        echo "  docker run --network host lsquic-speed-test client -s 10.0.0.1:9331 -b 2G"
+        echo "  docker run --network host lsquic-speed-test server -C bbr"
+        echo "  docker run --network host lsquic-speed-test client -s 192.168.1.100:9331 -b 500M -C bbr"
         exit 1
         ;;
 esac
