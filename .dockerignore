@@ -1,0 +1,19 @@
+# Ignore build directories
+build/
+*/build/
+
+# Ignore git directories
+.git/
+.gitmodules
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore object files
+*.o
+*.a
+*.so
+*.dylib

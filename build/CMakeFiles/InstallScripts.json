@@ -1,0 +1,10 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/kaleb/Documents/pcdn/libdatachannel/deps/lsquic/build/cmake_install.cmake",
+		"/Users/kaleb/Documents/pcdn/libdatachannel/deps/lsquic/build/bin/cmake_install.cmake",
+		"/Users/kaleb/Documents/pcdn/libdatachannel/deps/lsquic/build/src/cmake_install.cmake",
+		"/Users/kaleb/Documents/pcdn/libdatachannel/deps/lsquic/build/src/liblsquic/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

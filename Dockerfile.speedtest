@@ -1,0 +1,95 @@
+# LSQUIC Speed Test - Standalone Dockerfile
+# 
+# Build from lsquic directory:
+#   docker build -t lsquic-speed-test -f Dockerfile.speedtest .
+#
+# Usage (with host network for best performance):
+#   Server: docker run --network host lsquic-speed-test server
+#   Client: docker run --network host lsquic-speed-test client -s <server_ip>:9331 -b 1G
+
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    golang \
+    libevent-dev \
+    zlib1g-dev \
+    perl \
+    openssl \
+    clang \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Build BoringSSL with Clang (required for __has_feature support)
+RUN git clone https://boringssl.googlesource.com/boringssl && \
+    cd boringssl && \
+    git checkout 9fc1c33e9c21439ce5f87855a6591a9324e569fd && \
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=clang \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -B build . && \
+    cmake --build build -j$(nproc) --target ssl crypto
+
+# Copy lsquic source
+COPY . /build/lsquic
+
+# Build lsquic (clean any cached build files first)
+RUN cd /build/lsquic && \
+    rm -rf build CMakeCache.txt CMakeFiles && \
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DSSLLIB_INCLUDE=/build/boringssl/include \
+          -DLIBSSL_LIB=/build/boringssl/build \
+          -DLSQUIC_BIN=ON \
+          -B build . && \
+    cmake --build build -j$(nproc) --target speed_server speed_client
+
+# Generate certificates
+RUN openssl req -x509 -newkey rsa:2048 \
+    -keyout /build/key.pem -out /build/cert.pem \
+    -days 365 -nodes -subj "/CN=speedtest"
+
+# Runtime image
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    libevent-2.1-7 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /build/lsquic/build/bin/speed_server /app/
+COPY --from=builder /build/lsquic/build/bin/speed_client /app/
+COPY --from=builder /build/key.pem /app/
+COPY --from=builder /build/cert.pem /app/
+
+# Inline entrypoint
+RUN echo '#!/bin/bash\n\
+set -e\n\
+MODE=$1\n\
+shift\n\
+case "$MODE" in\n\
+    server)\n\
+        echo "LSQUIC Speed Test Server on 0.0.0.0:9331"\n\
+        exec /app/speed_server -c speedtest,/app/cert.pem,/app/key.pem -s 0.0.0.0:9331 "$@"\n\
+        ;;\n\
+    client)\n\
+        echo "LSQUIC Speed Test Client"\n\
+        exec /app/speed_client "$@"\n\
+        ;;\n\
+    *)\n\
+        echo "Usage (with --network host):"\n\
+        echo "  Server: docker run --network host IMAGE server"\n\
+        echo "  Client: docker run --network host IMAGE client -s HOST:9331 -b 1G"\n\
+        exit 1\n\
+        ;;\n\
+esac' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+EXPOSE 9331/udp
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["server"]
