@@ -35,12 +35,16 @@ RUN git clone https://boringssl.googlesource.com/boringssl && \
           -B build . && \
     cmake --build build -j$(nproc) --target ssl crypto
 
-# Copy lsquic source
-COPY . /build/lsquic
+# Clone lsquic with submodules
+RUN git clone --recursive https://github.com/litespeedtech/lsquic.git /build/lsquic
 
-# Build lsquic (clean any cached build files first)
+# Copy our custom speed test files
+COPY bin/speed_server.c /build/lsquic/bin/
+COPY bin/speed_client.c /build/lsquic/bin/
+COPY bin/CMakeLists.txt /build/lsquic/bin/
+
+# Build lsquic
 RUN cd /build/lsquic && \
-    rm -rf build CMakeCache.txt CMakeFiles && \
     cmake -DCMAKE_BUILD_TYPE=Release \
           -DSSLLIB_INCLUDE=/build/boringssl/include \
           -DLIBSSL_LIB=/build/boringssl/build \
